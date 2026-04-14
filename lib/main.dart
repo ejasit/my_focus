@@ -85,11 +85,19 @@ class _FocusHomePageState extends State<FocusHomePage> {
     setState(() => _isPinned = enable);
     if (enable) {
       await windowManager.setAlwaysOnTop(true);
-      await windowManager.setResizable(false);
-      await windowManager.setSize(const Size(340, 450));
+      await windowManager.setResizable(true);
+      await windowManager.setTitleBarStyle(TitleBarStyle.hidden);
+      await windowManager.setMinimizable(false);
+      await windowManager.setMaximizable(false);
+      await windowManager.setClosable(false);
+      await windowManager.setSize(const Size(320, 360));
     } else {
       await windowManager.setAlwaysOnTop(false);
       await windowManager.setResizable(true);
+      await windowManager.setTitleBarStyle(TitleBarStyle.normal);
+      await windowManager.setMinimizable(true);
+      await windowManager.setMaximizable(true);
+      await windowManager.setClosable(true);
       await windowManager.setSize(const Size(800, 600));
       await windowManager.center();
     }
@@ -103,7 +111,10 @@ class _FocusHomePageState extends State<FocusHomePage> {
   }
 
   void _startSession() {
-    if (_isRunning) { _stopSession(); return; }
+    if (_isRunning) {
+      _stopSession();
+      return;
+    }
     setState(() {
       _isRunning = true;
       _secondsRemaining = _sessionMinutes * 60;
@@ -124,7 +135,10 @@ class _FocusHomePageState extends State<FocusHomePage> {
 
   void _stopSession() {
     _timer?.cancel();
-    setState(() { _isRunning = false; _secondsRemaining = 0; });
+    setState(() {
+      _isRunning = false;
+      _secondsRemaining = 0;
+    });
   }
 
   void _showCompletionDialog() {
@@ -132,12 +146,15 @@ class _FocusHomePageState extends State<FocusHomePage> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: const Color(0xFF2A2A2A),
-        title: const Text('Session Complete! 🎉', style: TextStyle(color: Colors.white)),
+        title: const Text('Session Complete! 🎉',
+            style: TextStyle(color: Colors.white)),
         content: Text('You completed a $_sessionMinutes minute focus session.',
             style: const TextStyle(color: Colors.white70)),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx),
-              child: const Text('Done', style: TextStyle(color: Color(0xFFE8724A)))),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text('Done',
+                  style: TextStyle(color: Color(0xFFE8724A)))),
         ],
       ),
     );
@@ -156,13 +173,16 @@ class _FocusHomePageState extends State<FocusHomePage> {
     final text = _todoController.text.trim();
     if (text.isEmpty) return;
     setState(() {
-      _todos.add(TodoItem(id: DateTime.now().millisecondsSinceEpoch.toString(), title: text));
+      _todos.add(TodoItem(
+          id: DateTime.now().millisecondsSinceEpoch.toString(), title: text));
     });
     _todoController.clear();
   }
 
   void _toggleTodo(String id) {
-    setState(() { _todos.firstWhere((t) => t.id == id).isCompleted ^= true; });
+    setState(() {
+      _todos.firstWhere((t) => t.id == id).isCompleted ^= true;
+    });
   }
 
   void _deleteTodo(String id) {
@@ -211,8 +231,16 @@ class _FocusHomePageState extends State<FocusHomePage> {
         isRunning: _isRunning,
         timeDisplay: _timeDisplay,
         hasBreak: _hasBreak,
-        onIncrement: _isRunning ? null : () => setState(() { if (_sessionMinutes < 240) _sessionMinutes += 5; }),
-        onDecrement: _isRunning ? null : () => setState(() { if (_sessionMinutes > 5) _sessionMinutes -= 5; }),
+        onIncrement: _isRunning
+            ? null
+            : () => setState(() {
+                  if (_sessionMinutes < 240) _sessionMinutes += 5;
+                }),
+        onDecrement: _isRunning
+            ? null
+            : () => setState(() {
+                  if (_sessionMinutes > 5) _sessionMinutes -= 5;
+                }),
         onStart: _startSession,
         onClose: () => _togglePiP(false),
       );
@@ -234,21 +262,38 @@ class _FocusHomePageState extends State<FocusHomePage> {
                       child: Column(
                         children: [
                           _FocusCard(
-                            sessionMinutes: _sessionMinutes, isRunning: _isRunning,
-                            timeDisplay: _timeDisplay, hasBreak: _hasBreak,
+                            sessionMinutes: _sessionMinutes,
+                            isRunning: _isRunning,
+                            timeDisplay: _timeDisplay,
+                            hasBreak: _hasBreak,
                             isPinned: _isPinned,
-                            onIncrement: _isRunning ? null : () => setState(() { if (_sessionMinutes < 240) _sessionMinutes += 5; }),
-                            onDecrement: _isRunning ? null : () => setState(() { if (_sessionMinutes > 5) _sessionMinutes -= 5; }),
+                            onIncrement: _isRunning
+                                ? null
+                                : () => setState(() {
+                                      if (_sessionMinutes < 240)
+                                        _sessionMinutes += 5;
+                                    }),
+                            onDecrement: _isRunning
+                                ? null
+                                : () => setState(() {
+                                      if (_sessionMinutes > 5)
+                                        _sessionMinutes -= 5;
+                                    }),
                             onStart: _startSession,
                             onTogglePin: () => _togglePiP(true),
                             onOpenSettings: () => _showSettingsSheet(context),
                           ),
                           const SizedBox(height: 16),
-                          Expanded(child: _TodoCard(
-                            todos: _todos, controller: _todoController,
-                            selectedTaskId: _selectedTaskId, onAdd: _addTodo,
-                            onToggle: _toggleTodo, onDelete: _deleteTodo,
-                            onSelect: (id) => setState(() => _selectedTaskId = id),
+                          Expanded(
+                              child: _TodoCard(
+                            todos: _todos,
+                            controller: _todoController,
+                            selectedTaskId: _selectedTaskId,
+                            onAdd: _addTodo,
+                            onToggle: _toggleTodo,
+                            onDelete: _deleteTodo,
+                            onSelect: (id) =>
+                                setState(() => _selectedTaskId = id),
                           )),
                         ],
                       ),
@@ -262,7 +307,8 @@ class _FocusHomePageState extends State<FocusHomePage> {
                         streak: _streak,
                         completedMinutes: _completedToday,
                         progressFraction: _progressFraction,
-                        onGoalChanged: (h) => setState(() => _dailyGoalHours = h),
+                        onGoalChanged: (h) =>
+                            setState(() => _dailyGoalHours = h),
                       ),
                     ),
                   ],
@@ -271,11 +317,22 @@ class _FocusHomePageState extends State<FocusHomePage> {
                   child: Column(
                     children: [
                       _FocusCard(
-                        sessionMinutes: _sessionMinutes, isRunning: _isRunning,
-                        timeDisplay: _timeDisplay, hasBreak: _hasBreak,
+                        sessionMinutes: _sessionMinutes,
+                        isRunning: _isRunning,
+                        timeDisplay: _timeDisplay,
+                        hasBreak: _hasBreak,
                         isPinned: _isPinned,
-                        onIncrement: _isRunning ? null : () => setState(() { if (_sessionMinutes < 240) _sessionMinutes += 5; }),
-                        onDecrement: _isRunning ? null : () => setState(() { if (_sessionMinutes > 5) _sessionMinutes -= 5; }),
+                        onIncrement: _isRunning
+                            ? null
+                            : () => setState(() {
+                                  if (_sessionMinutes < 240)
+                                    _sessionMinutes += 5;
+                                }),
+                        onDecrement: _isRunning
+                            ? null
+                            : () => setState(() {
+                                  if (_sessionMinutes > 5) _sessionMinutes -= 5;
+                                }),
                         onStart: _startSession,
                         onTogglePin: () => _togglePiP(true),
                         onOpenSettings: () => _showSettingsSheet(context),
@@ -287,15 +344,22 @@ class _FocusHomePageState extends State<FocusHomePage> {
                         streak: _streak,
                         completedMinutes: _completedToday,
                         progressFraction: _progressFraction,
-                        onGoalChanged: (h) => setState(() => _dailyGoalHours = h),
+                        onGoalChanged: (h) =>
+                            setState(() => _dailyGoalHours = h),
                       ),
                       const SizedBox(height: 16),
-                      SizedBox(height: 380, child: _TodoCard(
-                        todos: _todos, controller: _todoController,
-                        selectedTaskId: _selectedTaskId, onAdd: _addTodo,
-                        onToggle: _toggleTodo, onDelete: _deleteTodo,
-                        onSelect: (id) => setState(() => _selectedTaskId = id),
-                      )),
+                      SizedBox(
+                          height: 380,
+                          child: _TodoCard(
+                            todos: _todos,
+                            controller: _todoController,
+                            selectedTaskId: _selectedTaskId,
+                            onAdd: _addTodo,
+                            onToggle: _toggleTodo,
+                            onDelete: _deleteTodo,
+                            onSelect: (id) =>
+                                setState(() => _selectedTaskId = id),
+                          )),
                     ],
                   ),
                 ),
@@ -329,90 +393,62 @@ class _PipOverlay extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF1A1A1A),
-      body: Center(
+      body: GestureDetector(
+        onPanStart: (_) => windowManager.startDragging(),
         child: Container(
-          width: 300,
-          decoration: BoxDecoration(
-            color: const Color(0xFF212121),
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: Colors.white.withOpacity(0.07)),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.6),
-                blurRadius: 40,
-                offset: const Offset(0, 10),
-              ),
-            ],
-          ),
+          width: double.infinity,
+          height: double.infinity,
+          color: const Color(0xFF212121),
           child: Column(
-            mainAxisSize: MainAxisSize.min,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              // ── Title bar ──
-              Padding(
-                padding: const EdgeInsets.fromLTRB(14, 12, 10, 0),
-                child: Row(
-                  children: [
-                    const Icon(Icons.picture_in_picture_alt,
-                        color: Colors.white38, size: 17),
-                    const Spacer(),
-                    GestureDetector(
-                      onTap: onClose,
-                      child: Container(
-                        padding: const EdgeInsets.all(5),
-                        decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.08),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: const Icon(Icons.close,
-                            color: Colors.white54, size: 15),
-                      ),
-                    ),
-                  ],
+              // ── Exit PiP (Subtle) ──
+              Align(
+                alignment: Alignment.topRight,
+                child: Padding(
+                  padding: const EdgeInsets.only(right: 8, top: 4),
+                  child: IconButton(
+                    onPressed: onClose,
+                    icon: const Icon(Icons.open_in_full,
+                        size: 14, color: Colors.white24),
+                    visualDensity: VisualDensity.compact,
+                  ),
                 ),
               ),
 
-              const SizedBox(height: 22),
+              const Spacer(),
 
               // ── Timer + arrows ──
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 28),
+                padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Expanded(
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(vertical: 18),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFF2A2A2A),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              timeDisplay,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 44,
-                                fontWeight: FontWeight.w200,
-                                fontFamily: 'monospace',
-                              ),
-                            ),
-                            if (!isRunning)
-                              const Text('mins',
-                                  style: TextStyle(
-                                      color: Colors.white38, fontSize: 12)),
-                          ],
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          vertical: 16, horizontal: 20),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF2A2A2A),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        timeDisplay,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 48,
+                          fontWeight: FontWeight.w200,
+                          fontFamily: 'monospace',
                         ),
                       ),
                     ),
                     if (!isRunning) ...[
-                      const SizedBox(width: 10),
+                      const SizedBox(width: 8),
                       Column(
                         children: [
                           _ArrowButton(
                               icon: Icons.keyboard_arrow_up,
                               onTap: onIncrement),
-                          const SizedBox(height: 6),
+                          const SizedBox(height: 4),
                           _ArrowButton(
                               icon: Icons.keyboard_arrow_down,
                               onTap: onDecrement),
@@ -423,70 +459,37 @@ class _PipOverlay extends StatelessWidget {
                 ),
               ),
 
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
 
               // ── Break label ──
               Text(
-                hasBreak
-                    ? 'Session includes a short break'
-                    : "You'll have no breaks",
-                style: const TextStyle(color: Colors.white38, fontSize: 12),
+                hasBreak ? 'With break' : 'No breaks',
+                style: const TextStyle(color: Colors.white38, fontSize: 11),
               ),
 
-              // ── Skip breaks (shown when no auto-break) ──
-              if (!hasBreak) ...[
-                const SizedBox(height: 8),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Container(
-                      width: 15,
-                      height: 15,
-                      decoration: BoxDecoration(
-                        border:
-                            Border.all(color: Colors.white24, width: 1.5),
-                        borderRadius: BorderRadius.circular(3),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    const Text('Skip breaks',
-                        style: TextStyle(
-                            color: Colors.white38, fontSize: 13)),
-                  ],
-                ),
-              ],
-
-              const SizedBox(height: 22),
+              const SizedBox(height: 20),
 
               // ── Start button ──
               Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 20),
+                padding: const EdgeInsets.symmetric(horizontal: 40),
                 child: SizedBox(
                   width: double.infinity,
-                  child: ElevatedButton.icon(
+                  child: ElevatedButton(
                     onPressed: onStart,
-                    icon: Icon(
-                        isRunning ? Icons.stop : Icons.play_arrow,
-                        size: 16),
-                    label: Text(
-                      isRunning ? 'Stop session' : 'Start focus session',
-                      style: const TextStyle(
-                          fontSize: 13, fontWeight: FontWeight.w600),
-                    ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: const Color(0xFFE8724A),
                       foregroundColor: Colors.white,
-                      padding:
-                          const EdgeInsets.symmetric(vertical: 13),
+                      padding: const EdgeInsets.symmetric(vertical: 10),
                       shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(8)),
                       elevation: 0,
                     ),
+                    child: Icon(isRunning ? Icons.stop : Icons.play_arrow,
+                        size: 20),
                   ),
                 ),
               ),
-
-              const SizedBox(height: 22),
+              const Spacer(),
             ],
           ),
         ),
@@ -505,10 +508,16 @@ class _FocusCard extends StatelessWidget {
   final VoidCallback onStart, onTogglePin, onOpenSettings;
 
   const _FocusCard({
-    required this.sessionMinutes, required this.isRunning, required this.timeDisplay,
-    required this.hasBreak, required this.isPinned,
-    required this.onIncrement, required this.onDecrement,
-    required this.onStart, required this.onTogglePin, required this.onOpenSettings,
+    required this.sessionMinutes,
+    required this.isRunning,
+    required this.timeDisplay,
+    required this.hasBreak,
+    required this.isPinned,
+    required this.onIncrement,
+    required this.onDecrement,
+    required this.onStart,
+    required this.onTogglePin,
+    required this.onOpenSettings,
   });
 
   @override
@@ -560,12 +569,11 @@ class _FocusCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 8),
-          const Text(
-            "We'll turn off notifications and app alerts during each session.\nFor longer sessions, we'll add a short break so you can recharge.",
-            textAlign: TextAlign.center,
-            style: TextStyle(
-                color: Colors.white54, fontSize: 13, height: 1.5),
-          ),
+          // const Text(
+          //   "We'll turn off notifications and app alerts during each session.\nFor longer sessions, we'll add a short break so you can recharge.",
+          //   textAlign: TextAlign.center,
+          //   style: TextStyle(color: Colors.white54, fontSize: 13, height: 1.5),
+          // ),
           const SizedBox(height: 24),
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -574,8 +582,8 @@ class _FocusCard extends StatelessWidget {
                 decoration: BoxDecoration(
                     color: const Color(0xFF1E1E1E),
                     borderRadius: BorderRadius.circular(8)),
-                padding: const EdgeInsets.symmetric(
-                    horizontal: 20, vertical: 12),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                 child: Row(children: [
                   Text(timeDisplay,
                       style: const TextStyle(
@@ -586,8 +594,7 @@ class _FocusCard extends StatelessWidget {
                   const SizedBox(width: 4),
                   if (!isRunning)
                     const Text('mins',
-                        style: TextStyle(
-                            color: Colors.white54, fontSize: 13)),
+                        style: TextStyle(color: Colors.white54, fontSize: 13)),
                 ]),
               ),
               if (!isRunning) ...[
@@ -597,8 +604,7 @@ class _FocusCard extends StatelessWidget {
                       icon: Icons.keyboard_arrow_up, onTap: onIncrement),
                   const SizedBox(height: 4),
                   _ArrowButton(
-                      icon: Icons.keyboard_arrow_down,
-                      onTap: onDecrement),
+                      icon: Icons.keyboard_arrow_down, onTap: onDecrement),
                 ]),
               ],
             ],
@@ -614,10 +620,8 @@ class _FocusCard extends StatelessWidget {
             width: double.infinity,
             child: ElevatedButton.icon(
               onPressed: onStart,
-              icon:
-                  Icon(isRunning ? Icons.stop : Icons.play_arrow, size: 18),
-              label: Text(
-                  isRunning ? 'Stop session' : 'Start focus session',
+              icon: Icon(isRunning ? Icons.stop : Icons.play_arrow, size: 18),
+              label: Text(isRunning ? 'Stop session' : 'Start focus session',
                   style: const TextStyle(
                       fontSize: 14, fontWeight: FontWeight.w600)),
               style: ElevatedButton.styleFrom(
@@ -654,8 +658,7 @@ class _ArrowButton extends StatelessWidget {
             color: const Color(0xFF333333),
             borderRadius: BorderRadius.circular(6)),
         child: Icon(icon,
-            color: onTap != null ? Colors.white70 : Colors.white24,
-            size: 18),
+            color: onTap != null ? Colors.white70 : Colors.white24, size: 18),
       ),
     );
   }
@@ -666,7 +669,8 @@ class _ArrowButton extends StatelessWidget {
 class _SettingsSheet extends StatefulWidget {
   final int sessionMinutes, breakMinutes;
   final bool endSessionSound, endBreakSound;
-  final void Function(int session, int brk, bool sessSound, bool brkSound) onSave;
+  final void Function(int session, int brk, bool sessSound, bool brkSound)
+      onSave;
 
   const _SettingsSheet({
     required this.sessionMinutes,
@@ -723,9 +727,12 @@ class _SettingsSheetState extends State<_SettingsSheet> {
                         fontWeight: FontWeight.w700)),
                 const Spacer(),
                 IconButton(
-                  onPressed: () { _save(); Navigator.pop(context); },
-                  icon: const Icon(Icons.close,
-                      color: Colors.white54, size: 20),
+                  onPressed: () {
+                    _save();
+                    Navigator.pop(context);
+                  },
+                  icon:
+                      const Icon(Icons.close, color: Colors.white54, size: 20),
                 ),
               ],
             ),
@@ -764,7 +771,10 @@ class _SettingsSheetState extends State<_SettingsSheet> {
                 value: _session,
                 options: _sessionOptions,
                 label: (v) => '$v minutes',
-                onChanged: (v) { setState(() => _session = v); _save(); },
+                onChanged: (v) {
+                  setState(() => _session = v);
+                  _save();
+                },
               ),
             ),
             _SettingsSubRow(
@@ -773,7 +783,10 @@ class _SettingsSheetState extends State<_SettingsSheet> {
                 value: _brk,
                 options: _breakOptions,
                 label: (v) => '$v minutes',
-                onChanged: (v) { setState(() => _brk = v); _save(); },
+                onChanged: (v) {
+                  setState(() => _brk = v);
+                  _save();
+                },
               ),
             ),
           ],
@@ -783,15 +796,16 @@ class _SettingsSheetState extends State<_SettingsSheet> {
             subtitle: 'Play an alarm when focus period ends',
             trailing: Row(mainAxisSize: MainAxisSize.min, children: [
               Text(_sessSound ? 'On' : 'Off',
-                  style:
-                      const TextStyle(color: Colors.white54, fontSize: 13)),
+                  style: const TextStyle(color: Colors.white54, fontSize: 13)),
               const SizedBox(width: 8),
               Switch(
                 value: _sessSound,
-                onChanged: (v) { setState(() => _sessSound = v); _save(); },
-                activeColor: const Color(0xFFE8724A),
-                activeTrackColor:
-                    const Color(0xFFE8724A).withOpacity(0.4),
+                onChanged: (v) {
+                  setState(() => _sessSound = v);
+                  _save();
+                },
+                activeThumbColor: const Color(0xFFE8724A),
+                activeTrackColor: const Color(0xFFE8724A).withOpacity(0.4),
                 inactiveThumbColor: Colors.white38,
                 inactiveTrackColor: Colors.white12,
               ),
@@ -803,15 +817,16 @@ class _SettingsSheetState extends State<_SettingsSheet> {
             subtitle: 'Play an alarm when breaks end',
             trailing: Row(mainAxisSize: MainAxisSize.min, children: [
               Text(_brkSound ? 'On' : 'Off',
-                  style:
-                      const TextStyle(color: Colors.white54, fontSize: 13)),
+                  style: const TextStyle(color: Colors.white54, fontSize: 13)),
               const SizedBox(width: 8),
               Switch(
                 value: _brkSound,
-                onChanged: (v) { setState(() => _brkSound = v); _save(); },
-                activeColor: const Color(0xFFE8724A),
-                activeTrackColor:
-                    const Color(0xFFE8724A).withOpacity(0.4),
+                onChanged: (v) {
+                  setState(() => _brkSound = v);
+                  _save();
+                },
+                activeThumbColor: const Color(0xFFE8724A),
+                activeTrackColor: const Color(0xFFE8724A).withOpacity(0.4),
                 inactiveThumbColor: Colors.white38,
                 inactiveTrackColor: Colors.white12,
               ),
@@ -839,8 +854,7 @@ class _SettingsTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      padding:
-          const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
       decoration: BoxDecoration(
           color: const Color(0xFF2A2A2A),
           borderRadius: BorderRadius.circular(10)),
@@ -849,19 +863,17 @@ class _SettingsTile extends StatelessWidget {
           Icon(icon, color: Colors.white54, size: 22),
           const SizedBox(width: 14),
           Expanded(
-            child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title,
-                      style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w500)),
-                  const SizedBox(height: 2),
-                  Text(subtitle,
-                      style: const TextStyle(
-                          color: Colors.white38, fontSize: 12)),
-                ]),
+            child:
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(title,
+                  style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500)),
+              const SizedBox(height: 2),
+              Text(subtitle,
+                  style: const TextStyle(color: Colors.white38, fontSize: 12)),
+            ]),
           ),
           trailing,
         ],
@@ -879,21 +891,18 @@ class _SettingsSubRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
-      padding:
-          const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
         color: const Color(0xFF242424),
         borderRadius: BorderRadius.circular(8),
-        border:
-            Border.all(color: Colors.white.withOpacity(0.06)),
+        border: Border.all(color: Colors.white.withOpacity(0.06)),
       ),
       child: Row(
         children: [
           const SizedBox(width: 36),
           Expanded(
               child: Text(label,
-                  style: const TextStyle(
-                      color: Colors.white70, fontSize: 13))),
+                  style: const TextStyle(color: Colors.white70, fontSize: 13))),
           child,
         ],
       ),
@@ -926,10 +935,11 @@ class _DropdownPicker extends StatelessWidget {
             .map((v) => DropdownMenuItem(
                 value: v,
                 child: Text(label(v),
-                    style: const TextStyle(
-                        color: Colors.white, fontSize: 13))))
+                    style: const TextStyle(color: Colors.white, fontSize: 13))))
             .toList(),
-        onChanged: (v) { if (v != null) onChanged(v); },
+        onChanged: (v) {
+          if (v != null) onChanged(v);
+        },
         dropdownColor: const Color(0xFF333333),
         underline: const SizedBox.shrink(),
         icon: const Icon(Icons.keyboard_arrow_down,
@@ -996,16 +1006,13 @@ class _DailyProgressCard extends StatelessWidget {
                   centerSub: 'hours',
                   topLabel: 'Daily goal'),
               _StatColumn(
-                  label: 'Streak',
-                  value: streak.toString(),
-                  unit: 'days'),
+                  label: 'Streak', value: streak.toString(), unit: 'days'),
             ],
           ),
           const SizedBox(height: 20),
           Center(
               child: Text('Completed: $completedMinutes minutes',
-                  style: const TextStyle(
-                      color: Colors.white54, fontSize: 13))),
+                  style: const TextStyle(color: Colors.white54, fontSize: 13))),
         ],
       ),
     );
@@ -1024,16 +1031,17 @@ class _DailyProgressCard extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               IconButton(
-                onPressed: () =>
-                    setS(() { if (tempGoal > 1) tempGoal--; }),
+                onPressed: () => setS(() {
+                  if (tempGoal > 1) tempGoal--;
+                }),
                 icon: const Icon(Icons.remove, color: Colors.white70),
               ),
               Text('$tempGoal hrs',
-                  style: const TextStyle(
-                      color: Colors.white, fontSize: 22)),
+                  style: const TextStyle(color: Colors.white, fontSize: 22)),
               IconButton(
-                onPressed: () =>
-                    setS(() { if (tempGoal < 16) tempGoal++; }),
+                onPressed: () => setS(() {
+                  if (tempGoal < 16) tempGoal++;
+                }),
                 icon: const Icon(Icons.add, color: Colors.white70),
               ),
             ],
@@ -1075,8 +1083,7 @@ class _StatColumn extends StatelessWidget {
                 color: Colors.white,
                 fontSize: 28,
                 fontWeight: FontWeight.w300)),
-        Text(unit,
-            style: const TextStyle(color: Colors.white54, fontSize: 12)),
+        Text(unit, style: const TextStyle(color: Colors.white54, fontSize: 12)),
       ],
     );
   }
@@ -1114,8 +1121,7 @@ class _ProgressRing extends StatelessWidget {
                       fontSize: 28,
                       fontWeight: FontWeight.w300)),
               Text(centerSub,
-                  style: const TextStyle(
-                      color: Colors.white54, fontSize: 12)),
+                  style: const TextStyle(color: Colors.white54, fontSize: 12)),
             ]),
           ],
         ),
@@ -1199,8 +1205,7 @@ class _TodoCard extends StatelessWidget {
               decoration: BoxDecoration(
                   color: const Color(0xFF2564CF),
                   borderRadius: BorderRadius.circular(4)),
-              child:
-                  const Icon(Icons.check, color: Colors.white, size: 14),
+              child: const Icon(Icons.check, color: Colors.white, size: 14),
             ),
             const SizedBox(width: 10),
             const Text('To Do',
@@ -1210,29 +1215,26 @@ class _TodoCard extends StatelessWidget {
                     fontWeight: FontWeight.w600)),
             const Spacer(),
             Text('${pending.length} remaining',
-                style: const TextStyle(
-                    color: Colors.white38, fontSize: 12)),
+                style: const TextStyle(color: Colors.white38, fontSize: 12)),
           ]),
           const SizedBox(height: 16),
           Row(children: [
             Expanded(
                 child: TextField(
               controller: controller,
-              style:
-                  const TextStyle(color: Colors.white, fontSize: 14),
+              style: const TextStyle(color: Colors.white, fontSize: 14),
               decoration: InputDecoration(
                 hintText: 'Add a task...',
-                hintStyle: const TextStyle(
-                    color: Colors.white38, fontSize: 14),
+                hintStyle: const TextStyle(color: Colors.white38, fontSize: 14),
                 filled: true,
                 fillColor: const Color(0xFF1E1E1E),
                 border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
                     borderSide: BorderSide.none),
-                contentPadding: const EdgeInsets.symmetric(
-                    horizontal: 14, vertical: 12),
-                prefixIcon: const Icon(Icons.add,
-                    color: Colors.white38, size: 18),
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                prefixIcon:
+                    const Icon(Icons.add, color: Colors.white38, size: 18),
               ),
               onSubmitted: (_) => onAdd(),
             )),
@@ -1244,8 +1246,7 @@ class _TodoCard extends StatelessWidget {
                 decoration: BoxDecoration(
                     color: const Color(0xFFE8724A),
                     borderRadius: BorderRadius.circular(8)),
-                child: const Icon(Icons.add,
-                    color: Colors.white, size: 18),
+                child: const Icon(Icons.add, color: Colors.white, size: 18),
               ),
             ),
           ]),
@@ -1264,8 +1265,7 @@ class _TodoCard extends StatelessWidget {
               const Padding(
                 padding: EdgeInsets.symmetric(vertical: 10),
                 child: Text('Completed',
-                    style: TextStyle(
-                        color: Colors.white38, fontSize: 12)),
+                    style: TextStyle(color: Colors.white38, fontSize: 12)),
               ),
               ...done.map((t) => _TodoTile(
                     item: t,
@@ -1300,17 +1300,13 @@ class _TodoTile extends StatelessWidget {
       onTap: onSelect,
       child: Container(
         margin: const EdgeInsets.only(bottom: 4),
-        padding:
-            const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
         decoration: BoxDecoration(
-          color: isSelected
-              ? const Color(0xFF2E2E2E)
-              : Colors.transparent,
+          color: isSelected ? const Color(0xFF2E2E2E) : Colors.transparent,
           borderRadius: BorderRadius.circular(8),
           border: isSelected
               ? Border.all(
-                  color: const Color(0xFFE8724A).withOpacity(0.4),
-                  width: 1)
+                  color: const Color(0xFFE8724A).withOpacity(0.4), width: 1)
               : null,
         ),
         child: Row(children: [
@@ -1331,8 +1327,7 @@ class _TodoTile extends StatelessWidget {
                     : Colors.transparent,
               ),
               child: item.isCompleted
-                  ? const Icon(Icons.check,
-                      color: Colors.white, size: 12)
+                  ? const Icon(Icons.check, color: Colors.white, size: 12)
                   : null,
             ),
           ),
@@ -1340,13 +1335,10 @@ class _TodoTile extends StatelessWidget {
           Expanded(
               child: Text(item.title,
                   style: TextStyle(
-                    color: item.isCompleted
-                        ? Colors.white38
-                        : Colors.white70,
+                    color: item.isCompleted ? Colors.white38 : Colors.white70,
                     fontSize: 14,
-                    decoration: item.isCompleted
-                        ? TextDecoration.lineThrough
-                        : null,
+                    decoration:
+                        item.isCompleted ? TextDecoration.lineThrough : null,
                     decorationColor: Colors.white38,
                   ))),
           if (isSelected)
