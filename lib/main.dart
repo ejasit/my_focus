@@ -167,7 +167,7 @@ class _FocusHomePageState extends State<FocusHomePage> {
     return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
   }
 
-  bool get _hasBreak => _sessionMinutes >= 60;
+  bool get _hasBreak => _breakMinutes > 0;
 
   void _addTodo() {
     final text = _todoController.text.trim();
@@ -228,6 +228,7 @@ class _FocusHomePageState extends State<FocusHomePage> {
     if (_isPinned) {
       return _PipOverlay(
         sessionMinutes: _sessionMinutes,
+        breakMinutes: _breakMinutes,
         isRunning: _isRunning,
         timeDisplay: _timeDisplay,
         hasBreak: _hasBreak,
@@ -372,7 +373,7 @@ class _FocusHomePageState extends State<FocusHomePage> {
 // ─── PiP Overlay ─────────────────────────────────────────────────────────────
 
 class _PipOverlay extends StatelessWidget {
-  final int sessionMinutes;
+  final int sessionMinutes, breakMinutes;
   final bool isRunning, hasBreak;
   final String timeDisplay;
   final VoidCallback? onIncrement, onDecrement;
@@ -380,6 +381,7 @@ class _PipOverlay extends StatelessWidget {
 
   const _PipOverlay({
     required this.sessionMinutes,
+    required this.breakMinutes,
     required this.isRunning,
     required this.hasBreak,
     required this.timeDisplay,
@@ -463,7 +465,7 @@ class _PipOverlay extends StatelessWidget {
 
               // ── Break label ──
               Text(
-                hasBreak ? 'With break' : 'No breaks',
+                hasBreak ? 'Session includes a $breakMinutes min break' : 'No breaks',
                 style: const TextStyle(color: Colors.white38, fontSize: 11),
               ),
 
