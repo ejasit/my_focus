@@ -347,6 +347,23 @@ class _FocusHomePageState extends State<FocusHomePage>
     return parts.isEmpty ? '0m' : parts.join(' ');
   }
 
+  List<MapEntry<String?, int>> get _todaySortedEntries {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final todayLogs = _logs.where((l) {
+      final d = DateTime(l.date.year, l.date.month, l.date.day);
+      return d == today;
+    }).toList();
+
+    final map = <String?, int>{};
+    for (final log in todayLogs) {
+      map[log.tagId] = (map[log.tagId] ?? 0) + log.minutes;
+    }
+    final entries = map.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+    return entries;
+  }
+
   // ── Build ─────────────────────────────────────────────────────────────────
 
   @override
@@ -460,14 +477,25 @@ class _FocusHomePageState extends State<FocusHomePage>
                               const SizedBox(width: 16),
                               SizedBox(
                                 width: 300,
-                                child: _DailyProgressCard(
-                                  yesterdayMinutes: _yesterdayMinutes,
-                                  dailyGoalHours: _dailyGoalHours,
-                                  streak: _streak,
-                                  completedMinutes: _completedToday,
-                                  progressFraction: _progressFraction,
-                                  onGoalChanged: (h) =>
-                                      setState(() => _dailyGoalHours = h),
+                                child: Column(
+                                  children: [
+                                    _DailyProgressCard(
+                                      yesterdayMinutes: _yesterdayMinutes,
+                                      dailyGoalHours: _dailyGoalHours,
+                                      streak: _streak,
+                                      completedMinutes: _completedToday,
+                                      progressFraction: _progressFraction,
+                                      onGoalChanged: (h) =>
+                                          setState(() => _dailyGoalHours = h),
+                                    ),
+                                    const SizedBox(height: 16),
+                                    _TagRankingCard(
+                                      sorted: _todaySortedEntries,
+                                      tags: _tags,
+                                      totalMinutes: _completedToday,
+                                      fmtDuration: _fmtDuration,
+                                    ),
+                                  ],
                                 ),
                               ),
                             ],
@@ -510,6 +538,13 @@ class _FocusHomePageState extends State<FocusHomePage>
                                 progressFraction: _progressFraction,
                                 onGoalChanged: (h) =>
                                     setState(() => _dailyGoalHours = h),
+                              ),
+                              const SizedBox(height: 16),
+                              _TagRankingCard(
+                                sorted: _todaySortedEntries,
+                                tags: _tags,
+                                totalMinutes: _completedToday,
+                                fmtDuration: _fmtDuration,
                               ),
                               const SizedBox(height: 16),
                               SizedBox(
@@ -2403,6 +2438,93 @@ class _TodoTile extends StatelessWidget {
           ],
         ]),
       ),
+    );
+  }
+}
+
+// ─── Tag Ranking Card ─────────────────────────────────────────────────────────
+
+class _TagRankingCard extends StatelessWidget {
+  final List<MapEntry<String?, int>> sorted;
+  final List<WorkTag> tags;
+  final int totalMinutes;
+  final String Function(int) fmtDuration;
+
+  const _TagRankingCard({
+    required this.sorted,
+    required this.tags,
+    required this.totalMinutes,
+    required this.fmtDuration,
+  });
+
+  WorkTag? _tagById(String? id) => id == null
+      ? null
+      : tags.firstWhere((t) => t.id == id,
+          orElse: () => WorkTag(id: '', name: 'Untagged', color: Colors.grey));
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+          color: const Color(0xFF252525),
+          borderRadius: BorderRadius.circular(12)),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Text("Today's Tag Ranking",
+            style: TextStyle(
+                color: Colors.white,
+                fontSize: 15,
+                fontWeight: FontWeight.w600)),
+        const SizedBox(height: 16),
+        if (sorted.isEmpty)
+          const Center(
+              child: Padding(
+            padding: EdgeInsets.symmetric(vertical: 20),
+            child: Text('No focus sessions today.',
+                style: TextStyle(color: Colors.white38, fontSize: 12)),
+          ))
+        else
+          ...sorted.take(5).map((e) {
+            final tag = _tagById(e.key);
+            final maxVal = sorted.first.value.toDouble();
+            final frac = maxVal > 0 ? e.value / maxVal : 0.0;
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(tag?.name ?? 'Untagged',
+                          style: const TextStyle(
+                              color: Colors.white70, fontSize: 12)),
+                      Text(fmtDuration(e.value),
+                          style: const TextStyle(
+                              color: Colors.white38, fontSize: 11)),
+                    ],
+                  ),
+                  const SizedBox(height: 6),
+                  Stack(children: [
+                    Container(
+                        height: 6,
+                        decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.06),
+                            borderRadius: BorderRadius.circular(3))),
+                    FractionallySizedBox(
+                      widthFactor: frac.clamp(0.0, 1.0),
+                      child: Container(
+                          height: 6,
+                          decoration: BoxDecoration(
+                              color: (tag?.color ?? Colors.grey),
+                              borderRadius: BorderRadius.circular(3))),
+                    ),
+                  ]),
+                ],
+              ),
+            );
+          }).toList(),
+      ]),
     );
   }
 }
