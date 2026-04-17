@@ -117,6 +117,8 @@ class _FocusHomePageState extends State<FocusHomePage>
     TodoItem(id: '3', title: 'Team standup meeting', tagId: 't3'),
   ];
   final TextEditingController _todoController = TextEditingController();
+  final TextEditingController _timerEditController = TextEditingController();
+  bool _isEditingTimer = false;
   String? _selectedTaskId;
 
   // Tab
@@ -147,6 +149,7 @@ class _FocusHomePageState extends State<FocusHomePage>
   void dispose() {
     _timer?.cancel();
     _todoController.dispose();
+    _timerEditController.dispose();
     _tabController.dispose();
     super.dispose();
   }
@@ -234,10 +237,55 @@ class _FocusHomePageState extends State<FocusHomePage>
     );
   }
 
+  void _handleTimerEdit(String value) {
+    int totalMinutes = 0;
+    final parts = value.split(':');
+    try {
+      if (parts.length >= 2) {
+        final h = int.tryParse(parts[0]) ?? 0;
+        final m = int.tryParse(parts[1]) ?? 0;
+        totalMinutes = h * 60 + m;
+      } else if (parts.length == 1) {
+        totalMinutes = int.tryParse(parts[0]) ?? 0;
+      }
+    } catch (_) {}
+
+    if (totalMinutes > 0 && totalMinutes <= 1440) {
+      setState(() {
+        _sessionMinutes = totalMinutes;
+        _isEditingTimer = false;
+      });
+    } else {
+      setState(() {
+        _isEditingTimer = false;
+      });
+    }
+  }
+
+  void _toggleTimerEdit() {
+    if (_isRunning) return;
+    final h = _sessionMinutes ~/ 60;
+    final m = _sessionMinutes % 60;
+    setState(() {
+      _isEditingTimer = true;
+      _timerEditController.text =
+          '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}';
+    });
+  }
+
   String get _timeDisplay {
-    if (!_isRunning) return '${_sessionMinutes.toString().padLeft(2, '0')}:00';
-    final m = _secondsRemaining ~/ 60;
-    final s = _secondsRemaining % 60;
+    if (!_isRunning) {
+      final h = _sessionMinutes ~/ 60;
+      final m = _sessionMinutes % 60;
+      return '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}';
+    }
+    final totalSeconds = _secondsRemaining;
+    final h = totalSeconds ~/ 3600;
+    final m = (totalSeconds % 3600) ~/ 60;
+    final s = totalSeconds % 60;
+    if (h > 0) {
+      return '${h.toString().padLeft(2, '0')}:${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
+    }
     return '${m.toString().padLeft(2, '0')}:${s.toString().padLeft(2, '0')}';
   }
 
@@ -387,6 +435,10 @@ class _FocusHomePageState extends State<FocusHomePage>
                 }),
         onStart: _startSession,
         onClose: () => _togglePiP(false),
+        isEditing: _isEditingTimer,
+        timerController: _timerEditController,
+        onTimerTapped: _toggleTimerEdit,
+        onTimerSubmitted: _handleTimerEdit,
       );
     }
 
@@ -457,6 +509,10 @@ class _FocusHomePageState extends State<FocusHomePage>
                                       onTogglePin: () => _togglePiP(true),
                                       onOpenSettings: () =>
                                           _showSettingsSheet(context),
+                                      isEditing: _isEditingTimer,
+                                      timerController: _timerEditController,
+                                      onTimerTapped: _toggleTimerEdit,
+                                      onTimerSubmitted: _handleTimerEdit,
                                     ),
                                     const SizedBox(height: 16),
                                     Expanded(
@@ -528,6 +584,10 @@ class _FocusHomePageState extends State<FocusHomePage>
                                 onTogglePin: () => _togglePiP(true),
                                 onOpenSettings: () =>
                                     _showSettingsSheet(context),
+                                isEditing: _isEditingTimer,
+                                timerController: _timerEditController,
+                                onTimerTapped: _toggleTimerEdit,
+                                onTimerSubmitted: _handleTimerEdit,
                               ),
                               const SizedBox(height: 16),
                               _DailyProgressCard(
@@ -1417,6 +1477,10 @@ class _PipOverlay extends StatelessWidget {
   final String timeDisplay;
   final VoidCallback? onIncrement, onDecrement;
   final VoidCallback onStart, onClose;
+  final bool isEditing;
+  final TextEditingController timerController;
+  final VoidCallback onTimerTapped;
+  final ValueChanged<String> onTimerSubmitted;
 
   const _PipOverlay({
     required this.sessionMinutes,
@@ -1428,6 +1492,10 @@ class _PipOverlay extends StatelessWidget {
     required this.onDecrement,
     required this.onStart,
     required this.onClose,
+    required this.isEditing,
+    required this.timerController,
+    required this.onTimerTapped,
+    required this.onTimerSubmitted,
   });
 
   @override
@@ -1461,21 +1529,51 @@ class _PipOverlay extends StatelessWidget {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          vertical: 16, horizontal: 20),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF2A2A2A),
-                        borderRadius: BorderRadius.circular(10),
+                    Tooltip(
+                      message:
+                          isRunning ? 'Timer running' : 'Click to edit duration',
+                      child: GestureDetector(
+                        onTap: isRunning ? null : onTimerTapped,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              vertical: 16, horizontal: 20),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF2A2A2A),
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: isEditing
+                              ? SizedBox(
+                                  width: 150,
+                                  child: TextField(
+                                    controller: timerController,
+                                    autofocus: true,
+                                    keyboardType: TextInputType.datetime,
+                                    textAlign: TextAlign.center,
+                                    style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 48,
+                                        fontWeight: FontWeight.w200,
+                                        fontFamily: 'monospace'),
+                                    decoration: const InputDecoration(
+                                      isDense: true,
+                                      contentPadding: EdgeInsets.zero,
+                                      border: InputBorder.none,
+                                      hintText: '00:00',
+                                      hintStyle: TextStyle(color: Colors.white12),
+                                    ),
+                                    onSubmitted: onTimerSubmitted,
+                                  ),
+                                )
+                              : Text(timeDisplay,
+                                  style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 48,
+                                      fontWeight: FontWeight.w200,
+                                      fontFamily: 'monospace')),
+                        ),
                       ),
-                      child: Text(timeDisplay,
-                          style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 48,
-                              fontWeight: FontWeight.w200,
-                              fontFamily: 'monospace')),
                     ),
-                    if (!isRunning) ...[
+                    if (!isRunning && !isEditing) ...[
                       const SizedBox(width: 8),
                       Column(children: [
                         _ArrowButton(
@@ -1536,6 +1634,10 @@ class _FocusCard extends StatelessWidget {
   final ValueChanged<String?> onTagSelected;
   final VoidCallback? onIncrement, onDecrement;
   final VoidCallback onStart, onTogglePin, onOpenSettings;
+  final bool isEditing;
+  final TextEditingController timerController;
+  final VoidCallback onTimerTapped;
+  final ValueChanged<String> onTimerSubmitted;
 
   const _FocusCard({
     required this.sessionMinutes,
@@ -1551,6 +1653,10 @@ class _FocusCard extends StatelessWidget {
     required this.onStart,
     required this.onTogglePin,
     required this.onOpenSettings,
+    required this.isEditing,
+    required this.timerController,
+    required this.onTimerTapped,
+    required this.onTimerSubmitted,
   });
 
   @override
@@ -1599,26 +1705,48 @@ class _FocusCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               // Timer
-              Container(
-                decoration: BoxDecoration(
-                    color: const Color(0xFF1E1E1E),
-                    borderRadius: BorderRadius.circular(8)),
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                child: Row(children: [
-                  Text(timeDisplay,
-                      style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 32,
-                          fontWeight: FontWeight.w300,
-                          fontFamily: 'monospace')),
-                  const SizedBox(width: 4),
-                  if (!isRunning)
-                    const Text('mins',
-                        style: TextStyle(color: Colors.white38, fontSize: 12)),
-                ]),
+              Tooltip(
+                message: isRunning ? 'Timer running' : 'Click to edit duration',
+                child: GestureDetector(
+                  onTap: isRunning ? null : onTimerTapped,
+                  child: Container(
+                    decoration: BoxDecoration(
+                        color: const Color(0xFF1E1E1E),
+                        borderRadius: BorderRadius.circular(8)),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                    child: isEditing
+                        ? SizedBox(
+                            width: 100,
+                            child: TextField(
+                              controller: timerController,
+                              autofocus: true,
+                              keyboardType: TextInputType.datetime,
+                              style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 32,
+                                  fontWeight: FontWeight.w300,
+                                  fontFamily: 'monospace'),
+                              decoration: const InputDecoration(
+                                isDense: true,
+                                contentPadding: EdgeInsets.zero,
+                                border: InputBorder.none,
+                                hintText: '00:00',
+                                hintStyle: TextStyle(color: Colors.white12),
+                              ),
+                              onSubmitted: onTimerSubmitted,
+                            ),
+                          )
+                        : Text(timeDisplay,
+                            style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 32,
+                                fontWeight: FontWeight.w300,
+                                fontFamily: 'monospace')),
+                  ),
+                ),
               ),
-              if (!isRunning) ...[
+              if (!isRunning && !isEditing) ...[
                 const SizedBox(width: 8),
                 Column(children: [
                   _ArrowButton(
