@@ -533,25 +533,27 @@ class _FocusHomePageState extends State<FocusHomePage>
                               const SizedBox(width: 16),
                               SizedBox(
                                 width: 300,
-                                child: Column(
-                                  children: [
-                                    _DailyProgressCard(
-                                      yesterdayMinutes: _yesterdayMinutes,
-                                      dailyGoalHours: _dailyGoalHours,
-                                      streak: _streak,
-                                      completedMinutes: _completedToday,
-                                      progressFraction: _progressFraction,
-                                      onGoalChanged: (h) =>
-                                          setState(() => _dailyGoalHours = h),
-                                    ),
-                                    const SizedBox(height: 16),
-                                    _TagRankingCard(
-                                      sorted: _todaySortedEntries,
-                                      tags: _tags,
-                                      totalMinutes: _completedToday,
-                                      fmtDuration: _fmtDuration,
-                                    ),
-                                  ],
+                                child: SingleChildScrollView(
+                                  child: Column(
+                                    children: [
+                                      _DailyProgressCard(
+                                        yesterdayMinutes: _yesterdayMinutes,
+                                        dailyGoalHours: _dailyGoalHours,
+                                        streak: _streak,
+                                        completedMinutes: _completedToday,
+                                        progressFraction: _progressFraction,
+                                        onGoalChanged: (h) => setState(
+                                            () => _dailyGoalHours = h),
+                                      ),
+                                      const SizedBox(height: 16),
+                                      _TagRankingCard(
+                                        sorted: _todaySortedEntries,
+                                        tags: _tags,
+                                        totalMinutes: _completedToday,
+                                        fmtDuration: _fmtDuration,
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
                             ],
@@ -884,9 +886,147 @@ class _WorkTrackingTabState extends State<_WorkTrackingTab> {
   Widget build(BuildContext context) {
     final sorted = _sortedEntries;
     final w = MediaQuery.of(context).size.width;
-    final isWide = w > 700;
+    final isWide = w > 1000;
 
     final rangeLabel = _chartRange_label(widget.chartRange);
+
+    final chartArea = Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF252525),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // ── Chart header ──
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Legend (left)
+                SizedBox(
+                  width: 160,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: sorted.take(10).map((e) {
+                      final tag = _tagById(e.key);
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 6),
+                        child: Row(children: [
+                          Container(
+                              width: 12,
+                              height: 12,
+                              decoration: BoxDecoration(
+                                  color: tag?.color ?? Colors.grey,
+                                  borderRadius: BorderRadius.circular(2))),
+                          const SizedBox(width: 6),
+                          Expanded(
+                              child: Text(tag?.name ?? 'Untagged',
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                      color: Colors.white70, fontSize: 12))),
+                        ]),
+                      );
+                    }).toList(),
+                  ),
+                ),
+
+                // Center: title + pie chart
+                Expanded(
+                  child: Column(
+                    children: [
+                      Text(
+                        _chartTitle(widget.chartRange),
+                        style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        'Total ${widget.fmtDurationLong(widget.totalMinutes)}  ${_rangeLabel()}',
+                        style: const TextStyle(
+                            color: Colors.white38, fontSize: 11),
+                      ),
+                      Text(_avgPerDay(),
+                          style: const TextStyle(
+                              color: Colors.white38, fontSize: 11)),
+                      const SizedBox(height: 12),
+                      // Pie
+                      SizedBox(
+                        width: 220,
+                        height: 220,
+                        child: _PieChart(
+                          entries: sorted,
+                          tags: widget.tags,
+                          totalMinutes: widget.totalMinutes,
+                          hoveredIndex: _hoveredIndex,
+                          fmtDuration: widget.fmtDuration,
+                          onHover: (i) => setState(() => _hoveredIndex = i),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // ── Bottom bar: tabs + range selector ──
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            decoration: const BoxDecoration(
+              border: Border(top: BorderSide(color: Colors.white10)),
+            ),
+            child: SizedBox(
+              width: double.infinity,
+              child: Wrap(
+                alignment: WrapAlignment.spaceBetween,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  // Distribution / Ranking toggle
+                  _TabToggle(
+                    labels: const ['Distribution', 'Ranking'],
+                    selected: _showRanking ? 1 : 0,
+                    onSelect: (i) => setState(() => _showRanking = i == 1),
+                  ),
+                  // Range picker
+                  _RangeDropdown(
+                    value: widget.chartRange,
+                    onChanged: widget.onRangeChanged,
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    final tagListArea = Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF252525),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: _showRanking
+          ? _RankingView(
+              sorted: sorted,
+              tags: widget.tags,
+              totalMinutes: widget.totalMinutes,
+              fmtDuration: widget.fmtDuration,
+              onEdit: widget.onEditTag,
+              onDelete: widget.onDeleteTag,
+            )
+          : _TagManageView(
+              tags: widget.tags,
+              tagMinutes: widget.tagMinutes,
+              fmtDuration: widget.fmtDuration,
+              onEdit: widget.onEditTag,
+              onDelete: widget.onDeleteTag,
+            ),
+    );
 
     return Padding(
       padding: const EdgeInsets.all(20),
@@ -924,151 +1064,22 @@ class _WorkTrackingTabState extends State<_WorkTrackingTab> {
           ),
           const SizedBox(height: 16),
 
-          // ── Main chart area ──
-          Expanded(
-            child: Container(
-              decoration: BoxDecoration(
-                color: const Color(0xFF252525),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Column(
+          if (isWide)
+            Expanded(
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // ── Chart header ──
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 18, 20, 0),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        // Legend (left)
-                        SizedBox(
-                          width: 160,
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: sorted.take(10).map((e) {
-                              final tag = _tagById(e.key);
-                              return Padding(
-                                padding: const EdgeInsets.only(bottom: 6),
-                                child: Row(children: [
-                                  Container(
-                                      width: 12,
-                                      height: 12,
-                                      decoration: BoxDecoration(
-                                          color: tag?.color ?? Colors.grey,
-                                          borderRadius:
-                                              BorderRadius.circular(2))),
-                                  const SizedBox(width: 6),
-                                  Expanded(
-                                      child: Text(tag?.name ?? 'Untagged',
-                                          overflow: TextOverflow.ellipsis,
-                                          style: const TextStyle(
-                                              color: Colors.white70,
-                                              fontSize: 12))),
-                                ]),
-                              );
-                            }).toList(),
-                          ),
-                        ),
-
-                        // Center: title + pie chart
-                        Expanded(
-                          child: Column(
-                            children: [
-                              Text(
-                                _chartTitle(widget.chartRange),
-                                style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w700),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                'Total ${widget.fmtDurationLong(widget.totalMinutes)}  ${_rangeLabel()}',
-                                style: const TextStyle(
-                                    color: Colors.white38, fontSize: 11),
-                              ),
-                              Text(_avgPerDay(),
-                                  style: const TextStyle(
-                                      color: Colors.white38, fontSize: 11)),
-                              const SizedBox(height: 12),
-                              // Pie
-                              SizedBox(
-                                width: 220,
-                                height: 220,
-                                child: _PieChart(
-                                  entries: sorted,
-                                  tags: widget.tags,
-                                  totalMinutes: widget.totalMinutes,
-                                  hoveredIndex: _hoveredIndex,
-                                  fmtDuration: widget.fmtDuration,
-                                  onHover: (i) =>
-                                      setState(() => _hoveredIndex = i),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
-                  // ── Bottom bar: tabs + range selector ──
-                  const SizedBox(height: 12),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 16, vertical: 10),
-                    decoration: const BoxDecoration(
-                      border: Border(top: BorderSide(color: Colors.white10)),
-                    ),
-                    child: Row(
-                      children: [
-                        // Distribution / Ranking toggle
-                        _TabToggle(
-                          labels: const ['Distribution', 'Ranking'],
-                          selected: _showRanking ? 1 : 0,
-                          onSelect: (i) =>
-                              setState(() => _showRanking = i == 1),
-                        ),
-                        const Spacer(),
-                        // Range picker
-                        _RangeDropdown(
-                          value: widget.chartRange,
-                          onChanged: widget.onRangeChanged,
-                        ),
-                      ],
-                    ),
-                  ),
+                  Expanded(child: chartArea),
+                  const SizedBox(width: 16),
+                  Expanded(child: tagListArea),
                 ],
               ),
-            ),
-          ),
-
-          const SizedBox(height: 16),
-
-          // ── Tag list / ranking ──
-          Expanded(
-            child: Container(
-              decoration: BoxDecoration(
-                color: const Color(0xFF252525),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: _showRanking
-                  ? _RankingView(
-                      sorted: sorted,
-                      tags: widget.tags,
-                      totalMinutes: widget.totalMinutes,
-                      fmtDuration: widget.fmtDuration,
-                      onEdit: widget.onEditTag,
-                      onDelete: widget.onDeleteTag,
-                    )
-                  : _TagManageView(
-                      tags: widget.tags,
-                      tagMinutes: widget.tagMinutes,
-                      fmtDuration: widget.fmtDuration,
-                      onEdit: widget.onEditTag,
-                      onDelete: widget.onDeleteTag,
-                    ),
-            ),
-          ),
+            )
+          else ...[
+            chartArea,
+            const SizedBox(height: 16),
+            Expanded(child: tagListArea),
+          ],
         ],
       ),
     );
@@ -1666,157 +1677,160 @@ class _FocusCard extends StatelessWidget {
       decoration: BoxDecoration(
           color: const Color(0xFF252525),
           borderRadius: BorderRadius.circular(12)),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Header row
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              const Text('Get ready to focus',
-                  style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600)),
-              Row(mainAxisSize: MainAxisSize.min, children: [
-                Tooltip(
-                  message: 'Compact view',
-                  child: GestureDetector(
-                    onTap: onTogglePin,
-                    child: const Icon(Icons.picture_in_picture_alt,
-                        color: Colors.white38, size: 17),
+      child: SingleChildScrollView(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Header row
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text('Get ready to focus',
+                    style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600)),
+                Row(mainAxisSize: MainAxisSize.min, children: [
+                  Tooltip(
+                    message: 'Compact view',
+                    child: GestureDetector(
+                      onTap: onTogglePin,
+                      child: const Icon(Icons.picture_in_picture_alt,
+                          color: Colors.white38, size: 17),
+                    ),
                   ),
-                ),
-                const SizedBox(width: 8),
-                Tooltip(
-                  message: 'Settings',
-                  child: GestureDetector(
-                    onTap: onOpenSettings,
-                    child: const Icon(Icons.more_horiz,
-                        color: Colors.white38, size: 20),
+                  const SizedBox(width: 8),
+                  Tooltip(
+                    message: 'Settings',
+                    child: GestureDetector(
+                      onTap: onOpenSettings,
+                      child: const Icon(Icons.more_horiz,
+                          color: Colors.white38, size: 20),
+                    ),
                   ),
-                ),
-              ]),
-            ],
-          ),
-          const SizedBox(height: 16),
-
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              // Timer
-              Tooltip(
-                message: isRunning ? 'Timer running' : 'Click to edit duration',
-                child: GestureDetector(
-                  onTap: isRunning ? null : onTimerTapped,
-                  child: Container(
-                    decoration: BoxDecoration(
-                        color: const Color(0xFF1E1E1E),
-                        borderRadius: BorderRadius.circular(8)),
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                    child: isEditing
-                        ? SizedBox(
-                            width: 100,
-                            child: TextField(
-                              controller: timerController,
-                              autofocus: true,
-                              keyboardType: TextInputType.datetime,
-                              style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 32,
-                                  fontWeight: FontWeight.w300,
-                                  fontFamily: 'monospace'),
-                              decoration: const InputDecoration(
-                                isDense: true,
-                                contentPadding: EdgeInsets.zero,
-                                border: InputBorder.none,
-                                hintText: '00:00',
-                                hintStyle: TextStyle(color: Colors.white12),
-                              ),
-                              onSubmitted: onTimerSubmitted,
-                            ),
-                          )
-                        : Text(timeDisplay,
-                            style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 32,
-                                fontWeight: FontWeight.w300,
-                                fontFamily: 'monospace')),
-                  ),
-                ),
-              ),
-              if (!isRunning && !isEditing) ...[
-                const SizedBox(width: 8),
-                Column(children: [
-                  _ArrowButton(
-                      icon: Icons.keyboard_arrow_up, onTap: onIncrement),
-                  const SizedBox(height: 4),
-                  _ArrowButton(
-                      icon: Icons.keyboard_arrow_down, onTap: onDecrement),
                 ]),
               ],
-              const SizedBox(width: 16),
+            ),
+            const SizedBox(height: 16),
 
-              // Tag selector
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text('Tag this session',
-                        style: TextStyle(color: Colors.white38, fontSize: 11)),
-                    const SizedBox(height: 6),
-                    Wrap(
-                      spacing: 6,
-                      runSpacing: 6,
-                      children: [
-                        // None chip
-                        _TagChip(
-                          label: 'None',
-                          color: Colors.white24,
-                          selected: activeTag == null,
-                          onTap: () => onTagSelected(null),
-                        ),
-                        ...tags.map((t) => _TagChip(
-                              label: t.name,
-                              color: t.color,
-                              selected: activeTag?.id == t.id,
-                              onTap: () => onTagSelected(t.id),
-                            )),
-                      ],
+              Wrap(
+                alignment: WrapAlignment.start,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                spacing: 16,
+                runSpacing: 12,
+                children: [
+                  // Timer
+                  Tooltip(
+                    message: isRunning ? 'Timer running' : 'Click to edit duration',
+                    child: GestureDetector(
+                      onTap: isRunning ? null : onTimerTapped,
+                      child: Container(
+                        decoration: BoxDecoration(
+                            color: const Color(0xFF1E1E1E),
+                            borderRadius: BorderRadius.circular(8)),
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 10),
+                        child: isEditing
+                            ? SizedBox(
+                                width: 100,
+                                child: TextField(
+                                  controller: timerController,
+                                  autofocus: true,
+                                  keyboardType: TextInputType.datetime,
+                                  style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 32,
+                                      fontWeight: FontWeight.w300,
+                                      fontFamily: 'monospace'),
+                                  decoration: const InputDecoration(
+                                    isDense: true,
+                                    contentPadding: EdgeInsets.zero,
+                                    border: InputBorder.none,
+                                    hintText: '00:00',
+                                    hintStyle: TextStyle(color: Colors.white12),
+                                  ),
+                                  onSubmitted: onTimerSubmitted,
+                                ),
+                              )
+                            : Text(timeDisplay,
+                                style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 32,
+                                    fontWeight: FontWeight.w300,
+                                    fontFamily: 'monospace')),
+                      ),
                     ),
+                  ),
+                  if (!isRunning && !isEditing) ...[
+                    Column(children: [
+                      _ArrowButton(
+                          icon: Icons.keyboard_arrow_up, onTap: onIncrement),
+                      const SizedBox(height: 4),
+                      _ArrowButton(
+                          icon: Icons.keyboard_arrow_down, onTap: onDecrement),
+                    ]),
                   ],
+
+                  // Tag selector
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text('Tag this session',
+                          style: TextStyle(color: Colors.white38, fontSize: 11)),
+                      const SizedBox(height: 6),
+                      Wrap(
+                        spacing: 6,
+                        runSpacing: 6,
+                        children: [
+                          // None chip
+                          _TagChip(
+                            label: 'None',
+                            color: Colors.white24,
+                            selected: activeTag == null,
+                            onTap: () => onTagSelected(null),
+                          ),
+                          ...tags.map((t) => _TagChip(
+                                label: t.name,
+                                color: t.color,
+                                selected: activeTag?.id == t.id,
+                                onTap: () => onTagSelected(t.id),
+                              )),
+                        ],
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+
+            const SizedBox(height: 12),
+            Text(
+                hasBreak
+                    ? 'Session includes a short break'
+                    : "You'll have no breaks",
+                style: const TextStyle(color: Colors.white38, fontSize: 12)),
+            const SizedBox(height: 14),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: onStart,
+                icon:
+                    Icon(isRunning ? Icons.stop : Icons.play_arrow, size: 17),
+                label: Text(isRunning ? 'Stop session' : 'Start focus session',
+                    style: const TextStyle(
+                        fontSize: 13, fontWeight: FontWeight.w600)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFE8724A),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8)),
+                  elevation: 0,
                 ),
               ),
-            ],
-          ),
-
-          const SizedBox(height: 12),
-          Text(
-              hasBreak
-                  ? 'Session includes a short break'
-                  : "You'll have no breaks",
-              style: const TextStyle(color: Colors.white38, fontSize: 12)),
-          const SizedBox(height: 14),
-          SizedBox(
-            width: double.infinity,
-            child: ElevatedButton.icon(
-              onPressed: onStart,
-              icon: Icon(isRunning ? Icons.stop : Icons.play_arrow, size: 17),
-              label: Text(isRunning ? 'Stop session' : 'Start focus session',
-                  style: const TextStyle(
-                      fontSize: 13, fontWeight: FontWeight.w600)),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFE8724A),
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8)),
-                elevation: 0,
-              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -1858,19 +1872,20 @@ class _TagChip extends StatelessWidget {
                     BoxDecoration(color: color, shape: BoxShape.circle)),
             const SizedBox(width: 4),
           ],
-          Text(label,
-              style: TextStyle(
-                color: selected ? color : Colors.white38,
-                fontSize: 11,
-                fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
-              )),
+          Flexible(
+            child: Text(label,
+                overflow: TextOverflow.ellipsis,
+                style: TextStyle(
+                  color: selected ? color : Colors.white38,
+                  fontSize: 11,
+                  fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+                )),
+          ),
         ]),
       ),
     );
   }
-}
-
-// ─── Arrow Button ─────────────────────────────────────────────────────────────
+}// ─── Arrow Button ─────────────────────────────────────────────────────────────
 
 class _ArrowButton extends StatelessWidget {
   final IconData icon;
