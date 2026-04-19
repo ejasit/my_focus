@@ -179,6 +179,11 @@ class _FocusHomePageState extends State<FocusHomePage>
       _stopSession();
       return;
     }
+
+    if (_isEditingTimer) {
+      _handleTimerEdit(_timerEditController.text);
+    }
+
     setState(() {
       _isRunning = true;
       _secondsRemaining = _sessionMinutes * 60;
