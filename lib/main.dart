@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'dart:math';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -34,6 +36,20 @@ class TodoItem {
       required this.title,
       this.isCompleted = false,
       this.tagId});
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'title': title,
+        'isCompleted': isCompleted,
+        'tagId': tagId,
+      };
+
+  factory TodoItem.fromJson(Map<String, dynamic> json) => TodoItem(
+        id: json['id'],
+        title: json['title'],
+        isCompleted: json['isCompleted'],
+        tagId: json['tagId'],
+      );
 }
 
 class WorkTag {
@@ -41,6 +57,18 @@ class WorkTag {
   String name;
   Color color;
   WorkTag({required this.id, required this.name, required this.color});
+
+  Map<String, dynamic> toJson() => {
+        'id': id,
+        'name': name,
+        'color': color.value,
+      };
+
+  factory WorkTag.fromJson(Map<String, dynamic> json) => WorkTag(
+        id: json['id'],
+        name: json['name'],
+        color: Color(json['color']),
+      );
 }
 
 class SessionLog {
@@ -48,6 +76,18 @@ class SessionLog {
   final int minutes;
   final DateTime date;
   SessionLog({required this.tagId, required this.minutes, required this.date});
+
+  Map<String, dynamic> toJson() => {
+        'tagId': tagId,
+        'minutes': minutes,
+        'date': date.toIso8601String(),
+      };
+
+  factory SessionLog.fromJson(Map<String, dynamic> json) => SessionLog(
+        tagId: json['tagId'],
+        minutes: json['minutes'],
+        date: DateTime.parse(json['date']),
+      );
 }
 
 // ─── App ─────────────────────────────────────────────────────────────────────
@@ -98,24 +138,14 @@ class _FocusHomePageState extends State<FocusHomePage>
   int _yesterdayMinutes = 0;
 
   // Tags
-  final List<WorkTag> _tags = [
-    WorkTag(id: 't1', name: 'Deep Work', color: const Color(0xFFE8724A)),
-    WorkTag(id: 't2', name: 'Learning', color: const Color(0xFF4A90E2)),
-    WorkTag(id: 't3', name: 'Meetings', color: const Color(0xFF7ED321)),
-    WorkTag(id: 't4', name: 'Admin', color: const Color(0xFFF5A623)),
-    WorkTag(id: 't5', name: 'Creative', color: const Color(0xFFBD10E0)),
-  ];
+  final List<WorkTag> _tags = [];
   String? _activeTagId;
 
   // Session logs
   final List<SessionLog> _logs = [];
 
   // Todos
-  final List<TodoItem> _todos = [
-    TodoItem(id: '1', title: 'Review project proposal', tagId: 't1'),
-    TodoItem(id: '2', title: 'Write weekly report', tagId: 't3'),
-    TodoItem(id: '3', title: 'Team standup meeting', tagId: 't3'),
-  ];
+  final List<TodoItem> _todos = [];
   final TextEditingController _todoController = TextEditingController();
   final TextEditingController _timerEditController = TextEditingController();
   bool _isEditingTimer = false;
@@ -131,19 +161,108 @@ class _FocusHomePageState extends State<FocusHomePage>
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    // Seed some demo logs
-    final now = DateTime.now();
-    final rng = Random(7);
-    final tagIds = _tags.map((t) => t.id).toList();
-    for (int i = 0; i < 40; i++) {
-      final day = now.subtract(Duration(days: rng.nextInt(30)));
-      _logs.add(SessionLog(
-        tagId: tagIds[rng.nextInt(tagIds.length)],
-        minutes: (rng.nextInt(6) + 1) * 5,
-        date: DateTime(day.year, day.month, day.day),
-      ));
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _sessionMinutes = prefs.getInt('sessionMinutes') ?? 30;
+      _breakMinutes = prefs.getInt('breakMinutes') ?? 5;
+      _endSessionSound = prefs.getBool('endSessionSound') ?? true;
+      _endBreakSound = prefs.getBool('endBreakSound') ?? true;
+      _dailyGoalHours = prefs.getInt('dailyGoalHours') ?? 8;
+
+      final tagsJson = prefs.getString('tags');
+      if (tagsJson != null) {
+        final List decode = jsonDecode(tagsJson);
+        _tags.clear();
+        _tags.addAll(decode.map((t) => WorkTag.fromJson(t)));
+      } else {
+        _tags.addAll([
+          WorkTag(id: 't1', name: 'Deep Work', color: const Color(0xFFE8724A)),
+          WorkTag(id: 't2', name: 'Learning', color: const Color(0xFF4A90E2)),
+          WorkTag(id: 't3', name: 'Meetings', color: const Color(0xFF7ED321)),
+          WorkTag(id: 't4', name: 'Admin', color: const Color(0xFFF5A623)),
+          WorkTag(id: 't5', name: 'Creative', color: const Color(0xFFBD10E0)),
+        ]);
+      }
+
+      final todosJson = prefs.getString('todos');
+      if (todosJson != null) {
+        final List decode = jsonDecode(todosJson);
+        _todos.clear();
+        _todos.addAll(decode.map((t) => TodoItem.fromJson(t)));
+      }
+
+      final logsJson = prefs.getString('logs');
+      if (logsJson != null) {
+        final List decode = jsonDecode(logsJson);
+        _logs.clear();
+        _logs.addAll(decode.map((l) => SessionLog.fromJson(l)));
+      }
+
+      _activeTagId = prefs.getString('activeTagId');
+      _updateStats();
+    });
+  }
+
+  Future<void> _saveData() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('sessionMinutes', _sessionMinutes);
+    await prefs.setInt('breakMinutes', _breakMinutes);
+    await prefs.setBool('endSessionSound', _endSessionSound);
+    await prefs.setBool('endBreakSound', _endBreakSound);
+    await prefs.setInt('dailyGoalHours', _dailyGoalHours);
+    await prefs.setString(
+        'tags', jsonEncode(_tags.map((t) => t.toJson()).toList()));
+    await prefs.setString(
+        'todos', jsonEncode(_todos.map((t) => t.toJson()).toList()));
+    await prefs.setString(
+        'logs', jsonEncode(_logs.map((l) => l.toJson()).toList()));
+    if (_activeTagId != null) {
+      await prefs.setString('activeTagId', _activeTagId!);
+    } else {
+      await prefs.remove('activeTagId');
     }
   }
+
+  void _updateStats() {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    final yesterday = today.subtract(const Duration(days: 1));
+
+    _completedToday = _logs
+        .where((l) => isSameDay(l.date, today))
+        .fold(0, (sum, l) => sum + l.minutes);
+
+    _yesterdayMinutes = _logs
+        .where((l) => isSameDay(l.date, yesterday))
+        .fold(0, (sum, l) => sum + l.minutes);
+
+    // Simple streak calculation
+    int streak = 0;
+    DateTime checkDay = today;
+    while (true) {
+      final dayMinutes = _logs
+          .where((l) => isSameDay(l.date, checkDay))
+          .fold(0, (sum, l) => sum + l.minutes);
+      if (dayMinutes > 0) {
+        streak++;
+        checkDay = checkDay.subtract(const Duration(days: 1));
+      } else {
+        if (checkDay == today) {
+          checkDay = checkDay.subtract(const Duration(days: 1));
+          continue;
+        }
+        break;
+      }
+    }
+    _streak = streak;
+  }
+
+  bool isSameDay(DateTime a, DateTime b) =>
+      a.year == b.year && a.month == b.month && a.day == b.day;
 
   @override
   void dispose() {
@@ -193,7 +312,6 @@ class _FocusHomePageState extends State<FocusHomePage>
         if (_secondsRemaining > 0) {
           _secondsRemaining--;
         } else {
-          _completedToday += _sessionMinutes;
           _isRunning = false;
           _timer?.cancel();
           _logs.add(SessionLog(
@@ -201,6 +319,8 @@ class _FocusHomePageState extends State<FocusHomePage>
             minutes: _sessionMinutes,
             date: DateTime.now(),
           ));
+          _updateStats();
+          _saveData();
           _showCompletionDialog();
         }
       });
@@ -220,6 +340,8 @@ class _FocusHomePageState extends State<FocusHomePage>
     setState(() {
       _isRunning = false;
       _secondsRemaining = 0;
+      _updateStats();
+      _saveData();
     });
   }
 
@@ -259,6 +381,7 @@ class _FocusHomePageState extends State<FocusHomePage>
       setState(() {
         _sessionMinutes = totalMinutes;
         _isEditingTimer = false;
+        _saveData();
       });
     } else {
       setState(() {
@@ -305,6 +428,7 @@ class _FocusHomePageState extends State<FocusHomePage>
         title: text,
         tagId: _activeTagId,
       ));
+      _saveData();
     });
     _todoController.clear();
   }
@@ -312,6 +436,7 @@ class _FocusHomePageState extends State<FocusHomePage>
   void _toggleTodo(String id) {
     setState(() {
       _todos.firstWhere((t) => t.id == id).isCompleted ^= true;
+      _saveData();
     });
   }
 
@@ -319,6 +444,7 @@ class _FocusHomePageState extends State<FocusHomePage>
     setState(() {
       _todos.removeWhere((t) => t.id == id);
       if (_selectedTaskId == id) _selectedTaskId = null;
+      _saveData();
     });
   }
 
@@ -339,6 +465,7 @@ class _FocusHomePageState extends State<FocusHomePage>
               _breakMinutes = brk;
               _endSessionSound = sessSound;
               _endBreakSound = brkSound;
+              _saveData();
             });
           },
         ),
@@ -547,8 +674,10 @@ class _FocusHomePageState extends State<FocusHomePage>
                                         streak: _streak,
                                         completedMinutes: _completedToday,
                                         progressFraction: _progressFraction,
-                                        onGoalChanged: (h) => setState(
-                                            () => _dailyGoalHours = h),
+                                        onGoalChanged: (h) => setState(() {
+                                          _dailyGoalHours = h;
+                                          _saveData();
+                                        }),
                                       ),
                                       const SizedBox(height: 16),
                                       _TagRankingCard(
@@ -573,8 +702,10 @@ class _FocusHomePageState extends State<FocusHomePage>
                                 isPinned: _isPinned,
                                 activeTag: _tagById(_activeTagId),
                                 tags: _tags,
-                                onTagSelected: (id) =>
-                                    setState(() => _activeTagId = id),
+                                onTagSelected: (id) => setState(() {
+                                  _activeTagId = id;
+                                  _saveData();
+                                }),
                                 onIncrement: _isRunning
                                     ? null
                                     : () => setState(() {
@@ -603,8 +734,10 @@ class _FocusHomePageState extends State<FocusHomePage>
                                 streak: _streak,
                                 completedMinutes: _completedToday,
                                 progressFraction: _progressFraction,
-                                onGoalChanged: (h) =>
-                                    setState(() => _dailyGoalHours = h),
+                                onGoalChanged: (h) => setState(() {
+                                  _dailyGoalHours = h;
+                                  _saveData();
+                                }),
                               ),
                               const SizedBox(height: 16),
                               _TagRankingCard(
@@ -646,6 +779,7 @@ class _FocusHomePageState extends State<FocusHomePage>
                     onDeleteTag: (id) => setState(() {
                       _tags.removeWhere((t) => t.id == id);
                       if (_activeTagId == id) _activeTagId = null;
+                      _saveData();
                     }),
                   ),
                 ],
@@ -721,13 +855,16 @@ class _FocusHomePageState extends State<FocusHomePage>
                   TextButton(
                     onPressed: () {
                       if (ctrl.text.trim().isNotEmpty) {
-                        setState(() => _tags.add(WorkTag(
-                              id: DateTime.now()
-                                  .millisecondsSinceEpoch
-                                  .toString(),
-                              name: ctrl.text.trim(),
-                              color: picked,
-                            )));
+                        setState(() {
+                          _tags.add(WorkTag(
+                            id: DateTime.now()
+                                .millisecondsSinceEpoch
+                                .toString(),
+                            name: ctrl.text.trim(),
+                            color: picked,
+                          ));
+                          _saveData();
+                        });
                       }
                       Navigator.pop(ctx);
                     },
@@ -807,6 +944,7 @@ class _FocusHomePageState extends State<FocusHomePage>
                             ? tag.name
                             : ctrl.text.trim();
                         tag.color = picked;
+                        _saveData();
                       });
                       Navigator.pop(ctx);
                     },
