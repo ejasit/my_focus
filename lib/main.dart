@@ -1,9 +1,11 @@
 import 'dart:async';
 import 'dart:math';
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:window_manager/window_manager.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:file_picker/file_picker.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -781,6 +783,8 @@ class _FocusHomePageState extends State<FocusHomePage>
                       if (_activeTagId == id) _activeTagId = null;
                       _saveData();
                     }),
+                    onImportData: _importData,
+                    onExportData: _exportData,
                   ),
                 ],
               ),
@@ -874,6 +878,79 @@ class _FocusHomePageState extends State<FocusHomePage>
                 ],
               )),
     );
+  }
+
+  Future<void> _exportData() async {
+    final Map<String, dynamic> data = {
+      'tags': _tags.map((t) => t.toJson()).toList(),
+      'logs': _logs.map((l) => l.toJson()).toList(),
+      'todos': _todos.map((t) => t.toJson()).toList(),
+    };
+
+    final jsonString = const JsonEncoder.withIndent('  ').convert(data);
+    final fileName = 'focus_data_${DateTime.now().millisecondsSinceEpoch}.json';
+
+    String? outputFile = await FilePicker.saveFile(
+      dialogTitle: 'Export Usage Data',
+      fileName: fileName,
+      type: FileType.custom,
+      allowedExtensions: ['json'],
+    );
+
+    if (outputFile != null) {
+      final file = File(outputFile);
+      await file.writeAsString(jsonString);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Data exported successfully')),
+        );
+      }
+    }
+  }
+
+  Future<void> _importData() async {
+    FilePickerResult? result = await FilePicker.pickFiles(
+      type: FileType.custom,
+      allowedExtensions: ['json'],
+    );
+
+    if (result != null && result.files.single.path != null) {
+      final file = File(result.files.single.path!);
+      final content = await file.readAsString();
+      try {
+        final Map<String, dynamic> data = jsonDecode(content);
+        setState(() {
+          if (data.containsKey('tags')) {
+            final List tagsJson = data['tags'];
+            _tags.clear();
+            _tags.addAll(tagsJson.map((t) => WorkTag.fromJson(t)));
+          }
+          if (data.containsKey('logs')) {
+            final List logsJson = data['logs'];
+            _logs.clear();
+            _logs.addAll(logsJson.map((l) => SessionLog.fromJson(l)));
+          }
+          if (data.containsKey('todos')) {
+            final List todosJson = data['todos'];
+            _todos.clear();
+            _todos.addAll(todosJson.map((t) => TodoItem.fromJson(t)));
+          }
+          _updateStats();
+          _saveData();
+        });
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Data imported successfully')),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error importing data: $e')),
+          );
+        }
+      }
+    }
   }
 
   void _showEditTagDialog(BuildContext context, WorkTag tag) {
@@ -971,6 +1048,8 @@ class _WorkTrackingTab extends StatefulWidget {
   final VoidCallback onAddTag;
   final ValueChanged<WorkTag> onEditTag;
   final ValueChanged<String> onDeleteTag;
+  final VoidCallback onImportData;
+  final VoidCallback onExportData;
 
   const _WorkTrackingTab({
     required this.tags,
@@ -984,6 +1063,8 @@ class _WorkTrackingTab extends StatefulWidget {
     required this.onAddTag,
     required this.onEditTag,
     required this.onDeleteTag,
+    required this.onImportData,
+    required this.onExportData,
   });
 
   @override
@@ -1139,6 +1220,24 @@ class _WorkTrackingTabState extends State<_WorkTrackingTab> {
                   _RangeDropdown(
                     value: widget.chartRange,
                     onChanged: widget.onRangeChanged,
+                  ),
+                  const SizedBox(width: 8),
+                  // Import/Export
+                  Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _SmallIconButton(
+                        icon: Icons.upload_file_outlined,
+                        tooltip: 'Import Data',
+                        onTap: widget.onImportData,
+                      ),
+                      const SizedBox(width: 8),
+                      _SmallIconButton(
+                        icon: Icons.download_for_offline_outlined,
+                        tooltip: 'Export Data',
+                        onTap: widget.onExportData,
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -2047,6 +2146,37 @@ class _ArrowButton extends StatelessWidget {
             borderRadius: BorderRadius.circular(6)),
         child: Icon(icon,
             color: onTap != null ? Colors.white70 : Colors.white24, size: 16),
+      ),
+    );
+  }
+}
+
+class _SmallIconButton extends StatelessWidget {
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback onTap;
+
+  const _SmallIconButton({
+    required this.icon,
+    required this.tooltip,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: tooltip,
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            color: const Color(0xFF2A2A2A),
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: Colors.white12),
+          ),
+          child: Icon(icon, color: Colors.white54, size: 14),
+        ),
       ),
     );
   }
